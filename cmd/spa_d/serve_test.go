@@ -53,7 +53,6 @@ func (suite *ServeTestSuite) SetupTest() {
 		Headers:             map[string]string{},
 		HeadersPerPathRegex: map[string]map[string]string{},
 		NotFoundRegexs:      []string{},
-		ResourceName:        "spa_d",
 		LoggingLevel:        "info",
 		JsonLogging:         false,
 	}
