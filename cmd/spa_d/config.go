@@ -106,7 +106,7 @@ func configureLogger(cfg Config) zerolog.Logger {
 	l.Info().
 		Str("logging-level", cfg.LoggingLevel).
 		Str("port", strconv.Itoa(cfg.Port)).
-		Str("resourceName", cfg.ResourceName).
+		Str("roots", strings.Join(cfg.RootDirs, ", ")).
 		Msg("Configuration")
 
 	return l
