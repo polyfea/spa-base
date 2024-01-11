@@ -14,38 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          node-version: 21
-      - run: npm ci
-      - run: npm run build 
-      - run: npm test
-  publish_npm_package:
-    if: github.event_name == 'release'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-        packages: write
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 21
-          registry-url: https://npm.pkg.github.com/
-      - run: npm ci
-      - run: npm run build      
-      - id: semver
-        uses: ildug/get-tag-action@v1
-      - run: npm version --git-tag-version=false ${{ steps.semver.outputs.version }} 
-      - uses: JS-DevTools/npm-publish@v3
-        with:
-            token: ${{ secrets.GITHUB_TOKEN }}
-            registry: "https://npm.pkg.github.com"
-            access: "public"
-      - uses: JS-DevTools/npm-publish@v3
-        with:
-            token: ${{ secrets.NPM_PUBLISH_TOKEN }}
-            access: "public"
+          go-version: '1.21'
+
+      - name: Build
+        run: go build -v ./cmd/spa_d
+
+      - name: Test
+        run: go test -v ./...
+
   publich_container:
     needs: build
     runs-on: ubuntu-latest
@@ -63,7 +42,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/polyfea/md-shell
+          images: ghcr.io/polyfea/spa-base
           tags: |
               type=schedule
               type=ref,event=branch
