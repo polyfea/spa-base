@@ -29,7 +29,7 @@ docker run -p 7105:7105 my_spa_server
 
 ## Configuration
 
-To configure the Single Page Applications Base Image, you'll need to modify the `/spa/config/spa_base.yaml` configuration file or change environment variables. Below are the available options:
+To configure the Single Page Applications Base Image, you'll need to modify the `/spa/config/spa-base.yaml` configuration file or change environment variables. Below are the available options:
 
 ```yaml
 # Port to Listen On (Default: 7105)
@@ -59,6 +59,9 @@ no-fallback-regexp: []
 # Response Headers to Add to All OK Responses (Default: empty)
 # You can specify a set of response headers to be included in all successful
 # (OK) responses. By default, this section is empty.
+# 
+# Default behaviour is to add `Cache-Control: no-cache` header to index.html responses, 
+# and `Cache-Control: public, max-age=31536000, immutable` to all other responses.
 # 
 # Example:
 # headers:

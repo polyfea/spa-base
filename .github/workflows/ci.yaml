@@ -25,7 +25,7 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-  publich_container:
+  publish_container:
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -51,8 +51,7 @@ jobs:
               type=ref,event=pr
               type=semver,pattern={{version}}
               type=semver,pattern={{major}}.{{minor}}
-              type=semver,pattern={{major}}     
-              type=raw,value=latest,enable={{is_default_branch}}
+              type=semver,pattern={{major}}
           labels: |
               maintainer=Polyfea-Owners
               org.opencontainers.image.title=polyfea/md-shell
@@ -61,6 +60,14 @@ jobs:
               org.opencontainers.image.source=${{github.repositoryUrl}}
               org.opencontainers.image.revision=${{github.run_id}}
               org.opencontainers.image.documentation=https://github.com/polyfea/md-shell/blob/main/readme.md
+          annotations: |
+            maintainer=Polyfea-Owners
+            org.opencontainers.image.title=polyfea/md-shell
+            org.opencontainers.image.description=Polyfea Application Shell
+            org.opencontainers.image.vendor=Polyfea Team
+            org.opencontainers.image.source=${{github.repositoryUrl}}
+            org.opencontainers.image.revision=${{github.run_id}}
+            org.opencontainers.image.documentation=https://github.com/polyfea/md-shell/blob/main/readme.md
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3

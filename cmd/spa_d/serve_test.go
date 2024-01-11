@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -197,6 +198,11 @@ func (suite *ServeTestSuite) Test_File_precompressed_br_Then_OK_and_encoded() {
 	// then
 	suite.Equal(http.StatusOK, rr.Code)
 	suite.Equal("br", rr.Header().Get("Content-Encoding"))
+	// application/javascript or text/javascript;charset=utf-8 - platform dependent
+	suite.True(
+		strings.Contains(rr.Header().Get("Content-Type"), "/javascript"),
+		"was %v but want `*/javascript`",
+		rr.Header().Get("Content-Type"))
 	suite.Equal(prebr_js_br, rr.Body.String())
 }
 
@@ -222,6 +228,11 @@ func (suite *ServeTestSuite) Test_File_precompressed_br_disabled_Then_OK_and_not
 	// then
 	suite.Equal(http.StatusOK, rr.Code)
 	suite.Equal("", rr.Header().Get("Content-Encoding"))
+	// application/javascript or text/javascript;charset=utf-8 - platform dependent
+	suite.True(
+		strings.Contains(rr.Header().Get("Content-Type"), "/javascript"),
+		"was %v but want `*/javascript`",
+		rr.Header().Get("Content-Type"))
 	suite.Equal(prebr_js, rr.Body.String())
 }
 
@@ -245,6 +256,11 @@ func (suite *ServeTestSuite) Test_File_precompressed_gz_Then_OK_and_encoded() {
 	// then
 	suite.Equal(http.StatusOK, rr.Code)
 	suite.Equal("gzip", rr.Header().Get("Content-Encoding"))
+	// application/javascript or text/javascript;charset=utf-8 - platform dependent
+	suite.True(
+		strings.Contains(rr.Header().Get("Content-Type"), "/javascript"),
+		"was %v but want `*/javascript`",
+		rr.Header().Get("Content-Type"))
 	suite.Equal(prebr_js_gz, rr.Body.String())
 }
 
@@ -270,6 +286,11 @@ func (suite *ServeTestSuite) Test_File_precompressed_gzip_disabled_Then_OK_and_n
 	// then
 	suite.Equal(http.StatusOK, rr.Code)
 	suite.Equal("", rr.Header().Get("Content-Encoding"))
+	// application/javascript or text/javascript;charset=utf-8 - platform dependent
+	suite.True(
+		strings.Contains(rr.Header().Get("Content-Type"), "/javascript"),
+		"was %v but want `*/javascript`",
+		rr.Header().Get("Content-Type"))
 	suite.Equal(prebr_js, rr.Body.String())
 }
 

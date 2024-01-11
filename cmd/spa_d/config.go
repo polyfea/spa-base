@@ -12,37 +12,37 @@ import (
 
 type Config struct {
 	// Port is the port to listen on.
-	Port int `json:"port"`
+	Port int `mapstructure:"port"`
 
 	// LoggingLevel is the logging level.
-	LoggingLevel string `json:"logging-level"`
+	LoggingLevel string `mapstructure:"logging-level"`
 
 	// JsonLogging is whether to log in json format.
-	JsonLogging bool `json:"json-logging"`
+	JsonLogging bool `mapstructure:"json-logging"`
 
 	// RootDirs is the list of root directories to search for resources.
-	RootDirs []string `json:"roots"`
+	RootDirs []string `mapstructure:"roots"`
 
 	// Headers is the map of headers to add to responses.
-	Headers map[string]string `json:"headers"`
+	Headers map[string]string `mapstructure:"headers"`
 
 	// HeadersPerPathRegex is the map of headers per path regex to add to responses.
-	HeadersPerPathRegex map[string]map[string]string `json:"headers-per-regexp"`
+	HeadersPerPathRegex map[string]map[string]string `mapstructure:"headers-per-regexp"`
 
 	// NotFoundRegexs is the list of path regexs to return 404 instead of fallback html.
-	NotFoundRegexs []string `json:"no-fallback-regexp"`
+	NotFoundRegexs []string `mapstructure:"no-fallback-regexp"`
 
 	// wheter to disable fallback to index.html
-	FallbackDisabled bool `json:"fallback-disabled"`
+	FallbackDisabled bool `mapstructure:"fallback-disabled"`
 
 	// gzip encoding disabled
-	GzipDisabled bool `json:"gzip-disabled"`
+	GzipDisabled bool `mapstructure:"gzip-disabled"`
 
 	// brotli encoding disabled
-	BrotliDisabled bool `json:"brotli-disabled"`
+	BrotliDisabled bool `mapstructure:"brotli-disabled"`
 
 	// telemetry disabled
-	TelemetryDisabled bool `json:"telemetry-disabled"`
+	TelemetryDisabled bool `mapstructure:"telemetry-disabled"`
 }
 
 func loadConfiguration() (cfg Config) {
@@ -57,28 +57,31 @@ func loadConfiguration() (cfg Config) {
 
 func configureViper() error {
 	viper.AddConfigPath("config")
-	viper.SetConfigName("spa_base")
+	viper.SetConfigName("spa-base")
 	viper.SetConfigType("yaml")
 	setDefaults()
 
-	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`, `-`, `_`))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
 	viper.SetEnvPrefix("SPA_BASE")
 	viper.AutomaticEnv()
-
 	err := viper.ReadInConfig()
-	return err
+	switch err.(type) {
+	case viper.ConfigFileNotFoundError:
+		log.Println("No configuration file found, using defaults")
+		return nil
+	default:
+		return err
+	}
 }
 
 func setDefaults() {
 	viper.SetDefault("port", 7105)
-	viper.SetDefault("logging-level", "Trace")
+	viper.SetDefault("logging-level", "info")
 	viper.SetDefault("json-logging", true)
 	viper.SetDefault("roots", []string{"./public"})
 	viper.SetDefault("headers", map[string]string{})
 	viper.SetDefault("headers-per-regexp", map[string]map[string]string{})
 	viper.SetDefault("not-found-regexp", []string{"(\\.js|\\.json|\\.mjs|\\.png|\\.jpe?g|\\.woff2)"})
-	viper.SetDefault("resourceName", "spa_d")
-
 }
 
 func configureLogger(cfg Config) zerolog.Logger {

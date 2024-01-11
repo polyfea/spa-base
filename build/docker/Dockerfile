@@ -1,7 +1,7 @@
 FROM golang AS builder
 
-RUN addgroup --system --gid 7105 etl 
-RUN adduser --system --uid 7105 --gid 7105 etl
+RUN addgroup --system --gid 7105 spa 
+RUN adduser --system --uid 7105 --gid 7105 spa
 WORKDIR $GOPATH/src/spa_base
 
 COPY ./go.*  ./
@@ -57,4 +57,7 @@ COPY --from=builder /go/bin /spa
 # ENV OTEL_SERVICE_NAME=my_spa 
 
 WORKDIR /spa
+
+EXPOSE 7105
+
 ENTRYPOINT ["/spa/spa_d"]

@@ -1,0 +1,75 @@
+# Port to Listen On (Default: 7105)
+# Specify the port number for the server to listen on. The default port is 7105.
+port: 7105
+
+# Root Directories (Default: /spa/public)
+# Define an array of root directories to search for static files. By default,
+# it looks in the /spa/public directory.
+roots: 
+- /spa/public
+
+# Disable Fallback to index.html (Default: false)
+# Setting this option to true will disable the fallback behavior to index.html
+# for all paths.
+fallback-disabled: false
+
+# Regular Expressions for No Fallback Paths (Default: empty)
+# Specify an array of regular expressions to match paths that should not
+# fallback to index.html. By default, the server falls back to index.html
+# for paths with a request header of Accept containing text/html or if
+# Accept is not present. You can completely disable this behavior by
+# setting fallback-disabled to true or by providing regular expressions
+# that match specific paths.
+no-fallback-regexp: []
+
+# Response Headers to Add to All OK Responses (Default: empty)
+# You can specify a set of response headers to be included in all successful
+# (OK) responses. By default, this section is empty.
+# 
+# Example:
+# headers:
+#   "X-Frame-Options": "DENY",
+#   "X-XSS-Protection": "1; mode=block",
+headers: {}
+
+# Response Headers to Add to OK Responses Matching Regular Expressions (Default: empty)
+# Define response headers that should be included in OK responses only when the
+# request path matches a specific regular expression. By default, this section is empty.
+# 
+# Example:
+# headers-per-regexp:
+#   "^.*\\.json$":
+#     "Cache-Control": "no-cache, no-store, must-revalidate"
+headers-per-regexp: {}
+
+# Disable Brotli Compression (Default: false)
+# By default, resources are provided in Brotli-encoded format if there is a
+# file with the same name and a .br extension. Set this option to true to 
+# disable Brotli compression.
+#
+# To generate the required Brotli files, you can use the following tooling:
+# Install 'preprocess' with 'npm i -D preprocess'.
+brotli-disabled: false
+
+# Disable Gzip Compression (Default: false)
+# By default, resources are provided in Gzip-encoded format if there is a
+# file with the same name and a .gz extension. Set this option to true to 
+# disable Gzip compression.
+#
+# To generate the required Gzip files, you can use the following tooling:
+# Install 'preprocess' with 'npm i -D preprocess'.
+gzip-disabled: false
+
+# Logging Level (Default: info)
+# Specify the desired logging level, which can be one of the following: debug, info, warn, error. 
+# The default level is set to 'info'.
+logging-level: info
+
+# Provide JSON Logs (Default: false)
+# Enabling this option will output logs in JSON format. By default, it is disabled.
+json-logging: false
+
+# Disable OpenTelemetry Exporters Initialization (Default: false)
+# When set to true, this option disables the initialization of OpenTelemetry exporters. 
+# The default behavior is to initialize them using noop exporters.
+telemetry-disabled: false

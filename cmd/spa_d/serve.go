@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -40,25 +43,30 @@ func (this *server) handler(ctx context.Context, w http.ResponseWriter, req *htt
 
 	found, err := this.findAndServeEncoded(ctx, resourcePath, w, req)
 
-	if found || err != nil {
+	if !found && err == nil {
+		found, err = this.fallback(ctx, w, req)
+	}
+
+	if err != nil {
+		logger.Err(err).Int("status", http.StatusInternalServerError).Msg("Error serving asset")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	if found := this.fallback(ctx, w, req); !found {
+	if !found {
 		telemetry().not_found.Add(ctx, 1,
 			metric.WithAttributes(
 				attribute.String("path", req.URL.Path),
 			))
 
 		logger.Info().Int("status", http.StatusNotFound).Msg("not found")
-		http.Error(w, "Fallback to index.html -  Not Found", http.StatusNotFound)
+		http.Error(w, "Not Found", http.StatusNotFound)
 	}
-
 }
 
-func (this *server) fallback(ctx context.Context, w http.ResponseWriter, req *http.Request) bool {
+func (this *server) fallback(ctx context.Context, w http.ResponseWriter, req *http.Request) (bool, error) {
 	if this.cfg.FallbackDisabled {
-		return false
+		return false, nil
 	}
 
 	if len(req.Header.Get("Accept")) != 0 &&
@@ -66,16 +74,16 @@ func (this *server) fallback(ctx context.Context, w http.ResponseWriter, req *ht
 			req.Header.Values("Accept"),
 			func(acp string) bool { return strings.HasPrefix(acp, "text/html") },
 		) {
-		return false
+		return false, nil
 	}
 
 	for _, regex := range this.cfg.NotFoundRegexs {
 		if match, _ := regexp.MatchString(regex, req.URL.Path); match {
-			return false
+			return false, nil
 		}
 	}
 
-	found, _ := this.findAndServeEncoded(ctx, "/index.html", w, req)
+	found, err := this.findAndServeEncoded(ctx, "/index.html", w, req)
 	if found {
 		telemetry().fallbacks.Add(ctx, 1,
 			metric.WithAttributes(
@@ -83,7 +91,7 @@ func (this *server) fallback(ctx context.Context, w http.ResponseWriter, req *ht
 			))
 	}
 
-	return found
+	return found, err
 }
 
 func (this *server) findAndServeEncoded(ctx context.Context, resourcePath string, w http.ResponseWriter, req *http.Request) (bool, error) {
@@ -115,13 +123,33 @@ func (this *server) findAndServeEncoded(ctx context.Context, resourcePath string
 					ext = "gz"
 				}
 
-				found, err := this.findAndServe(ctx, resourcePath+"."+ext, w, req)
-				if err != nil {
-					return false, err
-				}
+				if file, ok, _ := this.findFile(ctx, resourcePath+"."+ext); ok {
+					defer file.Close()
 
-				if found {
+					// set content type of unencrypted file
 					w.Header().Set("Content-Encoding", encoding)
+					ctype := mime.TypeByExtension(filepath.Ext(resourcePath))
+					if ctype == "" {
+						// find original resource and sniff content type
+						org, ok, err := this.findFile(ctx, resourcePath)
+						defer org.Close()
+						if err != nil {
+							return false, err
+						}
+						if ok {
+							// read a chunk to decide between utf-8 text and binary
+							var buf [512]byte
+							n, _ := io.ReadFull(org, buf[:])
+							ctype = http.DetectContentType(buf[:n])
+						}
+					}
+
+					if ctype == "" {
+						// fallback to binary if content type could not be detected
+						ctype = "application/octet-stream"
+					}
+
+					w.Header().Set("Content-Type", ctype)
 					if encoding == "br" {
 						telemetry().brotli_encrypted.Add(ctx, 1,
 							metric.WithAttributes(
@@ -134,7 +162,8 @@ func (this *server) findAndServeEncoded(ctx context.Context, resourcePath string
 								attribute.String("path", req.URL.Path),
 							))
 					}
-					return true, nil
+					err := this.serveContent(ctx, w, req, resourcePath, file)
+					return err == nil, err
 				}
 				return false, nil
 			}()
@@ -147,65 +176,75 @@ func (this *server) findAndServeEncoded(ctx context.Context, resourcePath string
 }
 
 func (this *server) findAndServe(ctx context.Context, resourcePath string, w http.ResponseWriter, req *http.Request) (bool, error) {
-	for _, rootDir := range this.cfg.RootDirs {
-		filePath := path.Join(rootDir, resourcePath)
-		found, err := this.lookupFile(ctx, filePath, resourcePath, w, req)
-		if found || err != nil {
-			return found, err
-		}
+	file, ok, err := this.findFile(ctx, resourcePath)
+	if err != nil {
+		return false, err
+	}
+	if ok {
+		defer file.Close()
+		err := this.serveContent(ctx, w, req, resourcePath, file)
+		return err == nil, err
 	}
 	return false, nil
 }
 
-func (this *server) lookupFile(
-	ctx context.Context,
-	filePath string,
-	resourcePath string,
-	w http.ResponseWriter,
-	req *http.Request,
-) (bool, error) {
-	ctx, span := telemetry().tracer.Start(
-		ctx, "spa_d.lookup_asset",
-		trace.WithAttributes(attribute.String("path", req.URL.Path)),
-		trace.WithAttributes(attribute.String("file", filePath)),
-	)
-	defer span.End()
-
+func (this *server) serveContent(ctx context.Context, w http.ResponseWriter, req *http.Request, name string, file *os.File) error {
 	logger := this.logger.With().Str("path", req.URL.Path).Logger()
-	file, err := os.Open(filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		logger.Err(err).Int("status", http.StatusInternalServerError).Msg("Error opening file")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return false, err
-	}
-	defer file.Close()
-
+	this.applyHeaders(ctx, w, req, name)
 	info, err := file.Stat()
 	if err != nil {
 		logger.Err(err).Int("status", http.StatusInternalServerError).Msg("Error getting file info")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return false, err
+		return err
 	}
 
-	if info.IsDir() {
-		return false, nil
+	http.ServeContent(w, req, name, info.ModTime(), file)
+	logger.Info().Int("status", http.StatusOK).Msg("asset served")
+	return nil
+}
+
+func (this *server) findFile(ctx context.Context, resourcePath string) (*os.File, bool, error) {
+	ctx, span := telemetry().tracer.Start(
+		ctx, "spa_d.lookup_asset",
+		trace.WithAttributes(attribute.String("file", resourcePath)),
+	)
+	defer span.End()
+
+	for _, rootDir := range this.cfg.RootDirs {
+		logger := this.logger.With().Str("path", resourcePath).Logger()
+		filePath := path.Join(rootDir, resourcePath)
+		file, err := os.Open(filePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, false, nil
+			}
+			logger.Err(err).Msg("Error opening file")
+			return nil, false, err
+		}
+		info, err := file.Stat()
+		if err != nil {
+			file.Close()
+			logger.Err(err).Msg("Error getting file info")
+			return nil, false, err
+		}
+
+		if info.IsDir() {
+			file.Close()
+			return nil, false, nil
+		}
+		return file, true, nil
 	}
 
-	if resourcePath != "/index.html" {
-		// set imutable cache header
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	} else {
-		// set no cache - index.html may be ssr rendered
-		w.Header().Set("Cache-Control", "no-cache")
-	}
+	return nil, false, nil
+}
 
-	for key, value := range this.cfg.Headers {
-		w.Header().Set(key, value)
-	}
+func (this *server) applyHeaders(
+	ctx context.Context,
+	w http.ResponseWriter,
+	req *http.Request,
+	resourcePath string,
+) {
 
+	// path specific headers
 	for rx, headers := range this.cfg.HeadersPerPathRegex {
 		if match, _ := regexp.MatchString(rx, resourcePath); match {
 			for hdr, value := range headers {
@@ -214,12 +253,21 @@ func (this *server) lookupFile(
 		}
 	}
 
-	telemetry().resources_served.Add(ctx, 1,
-		metric.WithAttributes(
-			attribute.String("path", req.URL.Path),
-			attribute.String("file", filePath),
-		))
-	http.ServeContent(w, req, resourcePath, info.ModTime(), file)
-	logger.Info().Int("status", http.StatusOK).Msg("asset served")
-	return true, nil
+	// merge missing global headers
+	for key, value := range this.cfg.Headers {
+		if _, ok := w.Header()[key]; !ok {
+			w.Header().Set(key, value)
+		}
+	}
+
+	// default cache control
+	if _, ok := w.Header()["Cache-Control"]; !ok {
+		if resourcePath != "/index.html" {
+			// set imutable cache header
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			// set no cache - index.html may be ssr rendered
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+	}
 }
