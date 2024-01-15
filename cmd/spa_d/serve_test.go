@@ -389,3 +389,29 @@ func (suite *ServeTestSuite) Test_File_exist_Then_resource_headers_are_applied()
 	suite.Equal("test2", rr.Header().Get("X-Test2"))
 	suite.Equal("immutable", rr.Header().Get("Cache-Control"))
 }
+
+func (suite *ServeTestSuite) Test_BaseUrl_prefix_and_relative_file_exists_Then_OK_With_Content() {
+
+	// given
+	cfg := suite.cfg
+	cfg.BaseURL = "/prefix/to/"
+	sut := &server{
+		cfg:    cfg,
+		logger: zerolog.New(os.Stdout),
+	}
+
+	req, err := http.NewRequest("GET", "/prefix/to/testfile.json", nil)
+
+	suite.Nil(err)
+
+	rr := httptest.NewRecorder()
+
+	// when
+	sut.handler(context.Background(), rr, req)
+
+	// then
+
+	suite.Equal(http.StatusOK, rr.Code)
+	suite.Equal(testfile_json, rr.Body.String())
+
+}

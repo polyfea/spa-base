@@ -42,6 +42,12 @@ port: 7105
 roots: 
 - /spa/public
 
+# Base URL (Default: /)
+# Specify the base URL for the server. The request's path must be prefixed with
+# this value. The remaining path is then searched relatively to the roots
+# folders. 
+base-url: /
+
 # Disable Fallback to index.html (Default: false)
 # Setting this option to true will disable the fallback behavior to index.html
 # for all paths.
@@ -118,7 +124,9 @@ You can use the following environment variables to override the configuration fi
 
 | Environment Variable             | Default    | Description                                                   |
 | -------------------------------- | ---------- | ------------------------------------------------------------- |
-| SPA_BASE_PORT                    | 7105       | Port to listen on                                             |
+| SPA_BASE_PORT                    | 7105       | Port to listen 
+on                                             |
+| SPA_BASE_BASE_URL                | /       | Base URL for the server. The request's path must be prefixed with this value. The remaining path is then searched relatively to the `ROOTS` directory |
 | SPA_BASE_ROOTS                   | /spa/public | Path to the static files                                      |
 | SPA_BASE_FALLBACK_DISABLED       | false      | Disables fallbacks to index.html                             |
 | SPA_BASE_BROTLI_DISABLED         | false      | Disables Brotli compression                                   |

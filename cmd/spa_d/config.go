@@ -20,6 +20,10 @@ type Config struct {
 	// JsonLogging is whether to log in json format.
 	JsonLogging bool `mapstructure:"json-logging"`
 
+	// BaseURL is the base url to use for the server.
+	// All paths will be resolved relatively to BaseURL.
+	BaseURL string `mapstructure:"base-url"`
+
 	// RootDirs is the list of root directories to search for resources.
 	RootDirs []string `mapstructure:"roots"`
 
@@ -76,6 +80,7 @@ func configureViper() error {
 
 func setDefaults() {
 	viper.SetDefault("port", 7105)
+	viper.SetDefault("base-url", "/")
 	viper.SetDefault("logging-level", "info")
 	viper.SetDefault("json-logging", true)
 	viper.SetDefault("roots", []string{"./public"})
