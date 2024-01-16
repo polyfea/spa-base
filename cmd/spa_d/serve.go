@@ -36,9 +36,20 @@ func (this *server) handler(ctx context.Context, w http.ResponseWriter, req *htt
 	defer span.End()
 
 	logger := this.logger.With().Str("path", req.URL.Path).Logger()
+
+	// strip base url
+	if this.cfg.BaseURL != "" {
+		if !strings.HasPrefix(req.URL.Path, this.cfg.BaseURL) {
+			logger.Info().Int("status", http.StatusNotFound).Msg("not found - base url mismatch")
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return
+		}
+		req.URL.Path = req.URL.Path[len(this.cfg.BaseURL):]
+	}
+
 	resourcePath := req.URL.Path
-	if resourcePath == "/" {
-		resourcePath = "/index.html"
+	if resourcePath == "" {
+		resourcePath = "index.html"
 	}
 
 	found, err := this.findAndServeEncoded(ctx, resourcePath, w, req)

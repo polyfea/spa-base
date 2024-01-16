@@ -44,22 +44,22 @@ jobs:
         with:
           images: ghcr.io/polyfea/spa-base
           tags: |
-              type=schedule
-              type=ref,event=branch
-              type=ref,event=branch,suffix={{date '.YYYYMMDD.HHmm'}}
-              type=ref,event=tag
-              type=ref,event=pr
-              type=semver,pattern={{version}}
-              type=semver,pattern={{major}}.{{minor}}
-              type=semver,pattern={{major}}
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=branch,suffix={{date '.YYYYMMDD.HHmm'}}
+            type=ref,event=tag
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
           labels: |
-              maintainer=Polyfea-Owners
-              org.opencontainers.image.title=polyfea/md-shell
-              org.opencontainers.image.description=Polyfea Application Shell
-              org.opencontainers.image.vendor=Polyfea Team
-              org.opencontainers.image.source=${{github.repositoryUrl}}
-              org.opencontainers.image.revision=${{github.run_id}}
-              org.opencontainers.image.documentation=https://github.com/polyfea/md-shell/blob/main/readme.md
+            maintainer=Polyfea-Owners
+            org.opencontainers.image.title=polyfea/md-shell
+            org.opencontainers.image.description=Polyfea Application Shell
+            org.opencontainers.image.vendor=Polyfea Team
+            org.opencontainers.image.source=${{github.repositoryUrl}}
+            org.opencontainers.image.revision=${{github.run_id}}
+            org.opencontainers.image.documentation=https://github.com/polyfea/md-shell/blob/main/readme.md
           annotations: |
             maintainer=Polyfea-Owners
             org.opencontainers.image.title=polyfea/md-shell
