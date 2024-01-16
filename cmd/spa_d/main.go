@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -24,7 +26,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:    ":" + strconv.Itoa(cfg.Port),
-		Handler: &server{cfg: cfg, logger: logger},
+		Handler: otelhttp.NewHandler(&server{cfg: cfg, logger: logger}, "serve-spa"),
 	}
 
 	func() {
