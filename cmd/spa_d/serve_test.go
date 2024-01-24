@@ -264,6 +264,36 @@ func (suite *ServeTestSuite) Test_File_precompressed_gz_Then_OK_and_encoded() {
 	suite.Equal(prebr_js_gz, rr.Body.String())
 }
 
+func (suite *ServeTestSuite) Test_File_precompressed_gz_and_base_url_set_Then_OK_and_encoded() {
+
+	cfg := suite.cfg
+	cfg.BaseURL = "/prefix/to/"
+	// given
+	sut := &server{
+		cfg:    cfg,
+		logger: zerolog.New(os.Stdout),
+	}
+
+	req, err := http.NewRequest("GET", "/prefix/to/prebr.js", nil)
+	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	suite.Nil(err)
+
+	rr := httptest.NewRecorder()
+
+	// when
+	sut.handler(context.Background(), rr, req)
+
+	// then
+	suite.Equal(http.StatusOK, rr.Code)
+	suite.Equal("gzip", rr.Header().Get("Content-Encoding"))
+	// application/javascript or text/javascript;charset=utf-8 - platform dependent
+	suite.True(
+		strings.Contains(rr.Header().Get("Content-Type"), "/javascript"),
+		"was %v but want `*/javascript`",
+		rr.Header().Get("Content-Type"))
+	suite.Equal(prebr_js_gz, rr.Body.String())
+}
+
 func (suite *ServeTestSuite) Test_File_precompressed_gzip_disabled_Then_OK_and_not_encoded() {
 
 	// given

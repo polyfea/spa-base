@@ -65,7 +65,7 @@ func configureViper() error {
 	viper.SetConfigType("yaml")
 	setDefaults()
 
-	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`, `-`, `_`))
 	viper.SetEnvPrefix("SPA_BASE")
 	viper.AutomaticEnv()
 	err := viper.ReadInConfig()
@@ -115,6 +115,7 @@ func configureLogger(cfg Config) zerolog.Logger {
 		Str("logging-level", cfg.LoggingLevel).
 		Str("port", strconv.Itoa(cfg.Port)).
 		Str("roots", strings.Join(cfg.RootDirs, ", ")).
+		Str("base-url", cfg.BaseURL).
 		Msg("Configuration")
 
 	return l
