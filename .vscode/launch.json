@@ -10,7 +10,13 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/spa_d",
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "env":{
+                "SPA_BASE_BASE_URL": "/assets/",
+                "SPA_BASE_ROOTS": "./cmd/spa_d/test/data/",
+                "SPA_BASE_ALLOW_SKIP_BASE_URL": "true",
+
+            }
         }
     ]
 }

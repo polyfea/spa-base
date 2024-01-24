@@ -81,7 +81,6 @@ func (suite *ServeTestSuite) Test_File_exists_Then_OK_With_Content() {
 
 	suite.Equal(http.StatusOK, rr.Code)
 	suite.Equal(testfile_json, rr.Body.String())
-
 }
 
 func (suite *ServeTestSuite) Test_File_not_exists_Then_Fallback_To_Index() {

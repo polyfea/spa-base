@@ -21,8 +21,12 @@ type Config struct {
 	JsonLogging bool `mapstructure:"json-logging"`
 
 	// BaseURL is the base url to use for the server.
-	// All paths will be resolved relatively to BaseURL.
+	// All file paths will be resolved as if relative to BaseURL.
 	BaseURL string `mapstructure:"base-url"`
+
+	// If enabled and request path does not starts with base url
+	// then the file will be searched in using the request path as is.
+	AllowSkipBaseUrl bool `mapstructure:"allow-skip-base-url"`
 
 	// RootDirs is the list of root directories to search for resources.
 	RootDirs []string `mapstructure:"roots"`
@@ -81,6 +85,7 @@ func configureViper() error {
 func setDefaults() {
 	viper.SetDefault("port", 7105)
 	viper.SetDefault("base-url", "/")
+	viper.SetDefault("allow-skip-base-url", false)
 	viper.SetDefault("logging-level", "info")
 	viper.SetDefault("json-logging", true)
 	viper.SetDefault("roots", []string{"./public"})
@@ -116,6 +121,7 @@ func configureLogger(cfg Config) zerolog.Logger {
 		Str("port", strconv.Itoa(cfg.Port)).
 		Str("roots", strings.Join(cfg.RootDirs, ", ")).
 		Str("base-url", cfg.BaseURL).
+		Bool("allow-skip-base-url", cfg.AllowSkipBaseUrl).
 		Msg("Configuration")
 
 	return l

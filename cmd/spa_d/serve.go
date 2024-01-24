@@ -14,6 +14,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -37,17 +38,19 @@ func (this *server) handler(ctx context.Context, w http.ResponseWriter, req *htt
 
 	logger := this.logger.With().Str("path", req.URL.Path).Logger()
 
+	resourcePath := req.URL.Path
 	// strip base url
 	if this.cfg.BaseURL != "" {
-		if !strings.HasPrefix(req.URL.Path, this.cfg.BaseURL) {
+		if strings.HasPrefix(req.URL.Path, this.cfg.BaseURL) {
+			resourcePath = req.URL.Path[len(this.cfg.BaseURL):]
+		} else if !this.cfg.AllowSkipBaseUrl {
+			span.SetStatus(codes.Error, "base url missing")
 			logger.Info().Int("status", http.StatusNotFound).Msg("not found - base url mismatch")
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
-		req.URL.Path = req.URL.Path[len(this.cfg.BaseURL):]
 	}
 
-	resourcePath := req.URL.Path
 	if resourcePath == "" {
 		resourcePath = "index.html"
 	}
@@ -59,6 +62,7 @@ func (this *server) handler(ctx context.Context, w http.ResponseWriter, req *htt
 	}
 
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		logger.Err(err).Int("status", http.StatusInternalServerError).Msg("Error serving asset")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -71,8 +75,10 @@ func (this *server) handler(ctx context.Context, w http.ResponseWriter, req *htt
 			))
 
 		logger.Info().Int("status", http.StatusNotFound).Msg("not found")
+		span.SetStatus(codes.Error, "not found")
 		http.Error(w, "Not Found", http.StatusNotFound)
 	}
+	span.SetStatus(codes.Ok, "ok")
 }
 
 func (this *server) fallback(ctx context.Context, w http.ResponseWriter, req *http.Request) (bool, error) {

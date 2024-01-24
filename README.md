@@ -124,10 +124,11 @@ You can use the following environment variables to override the configuration fi
 
 | Environment Variable             | Default    | Description                                                   |
 | -------------------------------- | ---------- | ------------------------------------------------------------- |
-| SPA_BASE_PORT                    | 7105       | Port to listen 
+| SPA_BASE_PORT                    | 7105       | Port to listen
 on                                             |
 | SPA_BASE_BASE_URL                | /       | Base URL for the server. The request's path must be prefixed with this value. The remaining path is then searched relatively to the `ROOTS` directory |
 | SPA_BASE_ROOTS                   | /spa/public | Path to the static files                                      |
+| SPA_BASE_ALLOW_SKIP_BASE_URL | false | If enabled then requests not matching base URL prefix will be processed as if the base url is set to `/`. This enables same processing with base url prefix stripped or remaining on the request path |
 | SPA_BASE_FALLBACK_DISABLED       | false      | Disables fallbacks to index.html                             |
 | SPA_BASE_BROTLI_DISABLED         | false      | Disables Brotli compression                                   |
 | SPA_BASE_GZIP_DISABLED           | false      | Disables Gzip compression                                     |
