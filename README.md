@@ -13,7 +13,7 @@ To use this base image, follow these steps:
 This makes it easy to deploy and serve your single page application with minimal configuration.
 
 ```Dockerfile
-FROM ghcr.io/polyfea/spa_base:latest
+FROM ghcr.io/polyfea/spa-base:latest
 
 COPY ./build /spa/public
 
