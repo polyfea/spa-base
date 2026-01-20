@@ -51,6 +51,11 @@ type Config struct {
 
 	// telemetry disabled
 	TelemetryDisabled bool `mapstructure:"telemetry-disabled"`
+
+	// If set to disable then no fallbacks for imports will be attempted
+	// otherwise shall be set to valid regexp to check which paths to attempt import fallbacks for.
+	// If empty then all paths are attempted.
+	ImportFallbackRegexp string `mapstructure:"import-fallback-regexp"`
 }
 
 func loadConfiguration() (cfg Config) {

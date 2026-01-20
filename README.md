@@ -1,6 +1,6 @@
 # Single Page Applications Base Image
 
-The Single Page Applications Base Image is a preconfigured image and service tailored for single page applications. It functions as a straightforward static resource server with optional fallback to `index.html` if a resource is not found. It also supports Brotli and Gzip precompressed files and allows for customization of response headers. Additionally, it comes with built-in instrumentation for [OpenTelemetry](https://opentelemetry.io/) and [Prometheus](https://prometheus.io/).
+The Single Page Applications Base Image is a preconfigured image and service tailored for single page applications. It functions as a straightforward static resource server with optional fallback to `index.html` or trying to resolve external JavaScript imports for modules without extension if a resource is not found. It also supports Brotli and Gzip precompressed files and allows for customization of response headers. Additionally, it comes with built-in instrumentation for [OpenTelemetry](https://opentelemetry.io/) and [Prometheus](https://prometheus.io/).
 
 ## Usage
 
@@ -116,6 +116,19 @@ json-logging: false
 # When set to true, this option disables the initialization of OpenTelemetry exporters. 
 # The default behavior is to initialize them using noop exporters.
 telemetry-disabled: false
+
+# Regular Expression for Import Fallbacks (Default: empty)
+# If set to a valid regular expression, only requests with paths matching this
+# expression will attempt import fallbacks when a resource is not found. If empty,
+# all paths are attempted for import fallbacks.
+# Setting it to "disable" will disable import fallbacks entirely.
+# The service will try to add ".js/mjs/cjs" extensions to the requested path.
+# 
+# This is intended to help with resolving external JavaScript imports from 
+# [importmap prefixes](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap#mapping_path_prefixes)
+# if a client package does not use file extension for those externalised imports 
+# (e.g. `import { property, state } from 'lit/decorators'';` instead of `import { property, state } from 'lit/decorators.js';`)
+import-fallback-regexp: ""
 ```
 
 ## Environment Variables

@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
@@ -56,6 +57,10 @@ func (this *server) handler(ctx context.Context, w http.ResponseWriter, req *htt
 	}
 
 	found, err := this.findAndServeEncoded(ctx, resourcePath, w, req)
+
+	if !found && err == nil {
+		found, err = this.importFallback(ctx, resourcePath, w, req)
+	}
 
 	if !found && err == nil {
 		found, err = this.fallback(ctx, w, req)
@@ -287,4 +292,59 @@ func (this *server) applyHeaders(
 			w.Header().Set("Cache-Control", "no-cache")
 		}
 	}
+
+}
+
+var importFallbackMap sync.Map = sync.Map{}
+
+// importFallbacks tries to serve JavaScript files that are not found by adding ".js" suffix
+// This is usefull if the SPA uses import statements  but internally omits the ".js" suffix (e.g. Vite projects)
+func (this *server) importFallback(ctx context.Context, resourcePath string, w http.ResponseWriter, req *http.Request) (bool, error) {
+	if !strings.HasPrefix(this.cfg.ImportFallbackRegexp, "disable") &&
+
+		!strings.HasSuffix(resourcePath, ".js") &&
+		!strings.HasSuffix(resourcePath, ".mjs") &&
+		!strings.HasSuffix(resourcePath, ".cjs") {
+
+		// check cache
+		if val, ok := importFallbackMap.Load(resourcePath); ok {
+			realPath := val.(string)
+			return this.findAndServeEncoded(ctx, realPath, w, req)
+		}
+
+		// check regexp if set
+		if this.cfg.ImportFallbackRegexp != "" {
+			matched := false
+			re, err := regexp.Compile(this.cfg.ImportFallbackRegexp)
+			if err != nil {
+				return false, err
+			}
+			if re.MatchString(resourcePath) {
+				matched = true
+			}
+			if !matched {
+				return false, nil
+			}
+		}
+
+		realPath := resourcePath + ".js"
+		found, err := this.findAndServeEncoded(ctx, realPath, w, req)
+
+		if !found && err == nil {
+			realPath = resourcePath + ".mjs"
+			found, err = this.findAndServeEncoded(ctx, realPath, w, req)
+		}
+		if !found && err == nil {
+			realPath = resourcePath + ".cjs"
+			found, err = this.findAndServeEncoded(ctx, realPath, w, req)
+		}
+
+		if found {
+			importFallbackMap.Store(resourcePath, realPath)
+
+		}
+
+		return found, err
+	}
+	return false, nil
 }
