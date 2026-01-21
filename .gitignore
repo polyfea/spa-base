@@ -1,3 +1,4 @@
 **/*.exe
 .github/
 build/
+cover.*

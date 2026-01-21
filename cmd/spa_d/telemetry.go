@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
@@ -27,41 +26,34 @@ type instruments struct {
 }
 
 // initialize OpenTelemetry instrumentations
-func initTelemetry(ctx context.Context, logger *zerolog.Logger) (shutdown func(context.Context) error, err error) {
+func initTelemetry(ctx context.Context) (shutdown func(context.Context) error, err error) {
 	metricReader, err := autoexport.NewMetricReader(ctx)
-	if err != nil {
-		return nil, err
-	}
+	if err == nil {
+		metricProvider :=
+			metricsdk.NewMeterProvider(metricsdk.WithReader(metricReader))
+		otel.SetMeterProvider(metricProvider)
 
-	metricProvider :=
-		metricsdk.NewMeterProvider(metricsdk.WithReader(metricReader))
-	otel.SetMeterProvider(metricProvider)
+		traceExporter, err := autoexport.NewSpanExporter(ctx)
+		if err == nil {
 
-	traceExporter, err := autoexport.NewSpanExporter(ctx)
-	if err != nil {
-		return nil, err
-	}
+			traceProvider := tracesdk.NewTracerProvider(
+				tracesdk.WithSyncer(traceExporter))
 
-	traceProvider := tracesdk.NewTracerProvider(
-		tracesdk.WithSyncer(traceExporter))
+			otel.SetTracerProvider(traceProvider)
+			otel.SetTextMapPropagator(propagation.TraceContext{})
 
-	otel.SetTracerProvider(traceProvider)
-	otel.SetTextMapPropagator(propagation.TraceContext{})
+			shutdown = func(context.Context) error {
+				errMetric := metricProvider.Shutdown(ctx)
+				errTrace := traceProvider.Shutdown(ctx)
 
-	shutdown = func(context.Context) error {
-		errMetric := metricProvider.Shutdown(ctx)
-		errTrace := traceProvider.Shutdown(ctx)
-
-		if errMetric != nil || errTrace != nil {
-			return fmt.Errorf("error shutting down telemetry: %v, %v", errMetric, errTrace)
+				return errors.Join(errMetric, errTrace)
+			}
 		}
-		return nil
 	}
-
-	return shutdown, nil
+	return shutdown, err
 }
 
-var telemetry = sync.OnceValue[instruments](func() instruments {
+var telemetry = sync.OnceValue(func() instruments {
 	var err error
 	instruments := instruments{}
 
@@ -72,36 +64,28 @@ var telemetry = sync.OnceValue[instruments](func() instruments {
 		metric.WithDescription("Count of resources served with success"),
 		metric.WithUnit("{resources}"),
 	)
-	if err != nil {
-		panic(err)
-	}
+	Must(err)
 
 	instruments.fallbacks, err = instruments.meters.Int64Counter(
 		"fallbacks",
 		metric.WithDescription("Count of served resources as fallback to index.html"),
 		metric.WithUnit("{resources}"),
 	)
-	if err != nil {
-		panic(err)
-	}
+	Must(err)
 
 	instruments.brotli_encrypted, err = instruments.meters.Int64Counter(
 		"brotli",
 		metric.WithDescription("Count of served resourcesencoded with brotli encoding"),
 		metric.WithUnit("{resources}"),
 	)
-	if err != nil {
-		panic(err)
-	}
+	Must(err)
 
 	instruments.gzip_encrypted, err = instruments.meters.Int64Counter(
 		"gzip",
 		metric.WithDescription("Count of served resources encoded with gzip encoding"),
 		metric.WithUnit("{resources}"),
 	)
-	if err != nil {
-		panic(err)
-	}
+	Must(err)
 
 	instruments.not_found, err = instruments.meters.Int64Counter(
 		"not_found",
@@ -109,9 +93,7 @@ var telemetry = sync.OnceValue[instruments](func() instruments {
 		metric.WithUnit("{resources}"),
 	)
 
-	if err != nil {
-		panic(err)
-	}
+	Must(err)
 
 	return instruments
 

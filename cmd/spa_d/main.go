@@ -8,19 +8,25 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
+
+var processCtx = context.Background() // allow test coverage by processContext externalized
 
 func main() {
 	cfg := loadConfiguration()
 	logger := configureLogger(cfg)
-	ctx := context.Background()
+	signalChannel := make(chan os.Signal, 2)
+	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
 
+	run(processCtx, cfg, logger, signalChannel)
+}
+
+func run(ctx context.Context, cfg Config, logger zerolog.Logger, signalChannel <-chan os.Signal) {
 	if !cfg.TelemetryDisabled {
-		shutdownTelemetry, err := initTelemetry(ctx, &logger)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("Cannot initialize telemetry")
-		}
+		shutdownTelemetry, err := initTelemetry(ctx)
+		Must(err)
 		defer shutdownTelemetry(ctx)
 	}
 
@@ -29,26 +35,26 @@ func main() {
 		Handler: otelhttp.NewHandler(&server{cfg: cfg, logger: logger}, "serve-spa"),
 	}
 
-	func() {
+	go func() {
 		logger.Info().Int("port", cfg.Port).Msg("Starting server")
 		err := httpServer.ListenAndServe()
-		if err != nil {
-			logger.Fatal().Err(err).Msg("Server failed")
-		}
+		logger.Info().Err(err).Msg("HTTP server stopped")
 	}()
 
-	signalChannel := make(chan os.Signal, 2)
-	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
-	for {
-		sig := <-signalChannel
-		switch sig {
-		case os.Interrupt:
-			logger.Info().Msg("interrupt")
-		case syscall.SIGTERM:
-			logger.Info().Msg("SIGTERM")
-			httpServer.Shutdown(ctx)
-			return
+	stop := false
+	for !stop {
+		select {
+		case sig := <-signalChannel:
+			if sig == os.Interrupt || sig == syscall.SIGTERM {
+				logger.Info().Str("signal", sig.String()).Msg("Shutdown signal received")
+				stop = true
+			}
+		case <-ctx.Done():
+			logger.Info().Msg("context done")
+			stop = true
 		}
+
 	}
 
+	httpServer.Shutdown(context.Background())
 }

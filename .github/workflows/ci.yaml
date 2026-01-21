@@ -19,11 +19,22 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build
+      - name: build
         run: go build -v ./cmd/spa_d
 
-      - name: Test
-        run: go test -v ./...
+      - name: Install Test Dependencies
+        run: go install github.com/go-task/task/v3/cmd/task@latest
+
+      - name: test
+        run: go test -coverprofile=./cover.out ./...
+      
+      - name: check test coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: ./.testcoverage.yaml
+          
+      - name: Check coverage threshold
+
 
   publish_container:
     needs: build
