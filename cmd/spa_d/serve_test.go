@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -442,5 +444,181 @@ func (suite *ServeTestSuite) Test_BaseUrl_prefix_and_relative_file_exists_Then_O
 
 	suite.Equal(http.StatusOK, rr.Code)
 	suite.Equal(testfile_json, rr.Body.String())
+}
 
+func (suite *ServeTestSuite) Test_ImportFallbacks() {
+	cfg := suite.cfg
+	cfg.BaseURL = "/imports/"
+	importFallbackMap = sync.Map{}
+	sut := &server{
+		cfg:    cfg,
+		logger: zerolog.New(os.Stdout),
+	}
+
+	for _, tc := range []struct {
+		path       string
+		expectBody string
+	}{
+		{"/imports/modules/test1", "test1.mjs"},
+		{"/imports/modules/test2", "test2.js"},
+		{"/imports/modules/test3", "test3.cjs"},
+		{"/imports/modules/test4", "test4.mjs.gz"},
+		{"/imports/modules/test1", "test1.mjs"}, // cached
+	} {
+		suite.Run(tc.path, func() {
+			req, err := http.NewRequest("GET", tc.path, nil)
+			req.Header.Set("Accept-Encoding", "gzip")
+			suite.Nil(err)
+			rr := httptest.NewRecorder()
+
+			// when
+			sut.ServeHTTP(rr, req)
+
+			// then
+			suite.Equal(http.StatusOK, rr.Code)
+			suite.Equal(tc.expectBody, rr.Body.String())
+		})
+	}
+}
+
+func (suite *ServeTestSuite) Test_ImportFallbacks_Regex() {
+
+	for _, tc := range []struct {
+		path       string
+		regex      string
+		expectCode int
+	}{
+		{"/imports/modules/test1", "disabled", http.StatusNotFound},
+		{"/imports/modules/test1", "^/?data/", http.StatusNotFound},
+		{"/imports/modules/test1", "^/?modules/", http.StatusOK},
+		{"/imports/modules/test1", "^/?[modules/", http.StatusInternalServerError},
+	} {
+		cfg := suite.cfg
+		cfg.BaseURL = "/imports/"
+		cfg.ImportFallbackRegexp = tc.regex
+		cfg.FallbackDisabled = true
+
+		importFallbackMap = sync.Map{}
+		sut := &server{
+			cfg:    cfg,
+			logger: zerolog.New(os.Stdout),
+		}
+
+		suite.Run(tc.regex, func() {
+			req, err := http.NewRequest("GET", tc.path, nil)
+			req.Header.Set("Accept-Encoding", "gzip")
+			suite.Nil(err)
+			rr := httptest.NewRecorder()
+
+			// when
+			sut.ServeHTTP(rr, req)
+
+			// then
+			suite.Equal(tc.expectCode, rr.Code)
+		})
+	}
+}
+
+func (suite *ServeTestSuite) Test_BaseUrl_missing() {
+	// given
+	cfg := suite.cfg
+	cfg.BaseURL = "/prefix/to/"
+	cfg.AllowSkipBaseUrl = false
+	sut := &server{
+		cfg:    cfg,
+		logger: zerolog.New(os.Stdout),
+	}
+
+	for _, tc := range []struct {
+		path       string
+		expectCode int
+	}{
+		{"/wrong/prefix/testfile.json", http.StatusNotFound},
+		{"/another/testfile.json", http.StatusNotFound},
+		{"/prefix/to", http.StatusOK},
+		{"/prefix/to/", http.StatusOK},
+	} {
+		suite.Run("path="+tc.path, func() {
+			req, err := http.NewRequest("GET", tc.path, nil)
+			suite.Nil(err)
+
+			rr := httptest.NewRecorder()
+
+			// when
+			sut.handler(context.Background(), rr, req)
+
+			// then
+			suite.Equal(tc.expectCode, rr.Code, "for path %v", tc.path)
+		})
+	}
+}
+
+func (suite *ServeTestSuite) Test_MimeTypes() {
+
+	sut := &server{
+		cfg:    suite.cfg,
+		logger: zerolog.New(os.Stdout),
+	}
+
+	for _, tc := range []struct {
+		path        string
+		contentType string
+	}{
+		{"/noext", "text/html"},
+		{"/prebr.js", "application/javascript"},
+		{"/logo.svg", "image/svg+xml"},
+		{"/logo.png", "image/png"},
+		{"/index.html", "text/html"},
+		{"/", "text/html"},
+
+		{"/unknw_type", "text/plain"},
+		{"/modules/test1", "application/javascript"},
+	} {
+		suite.Run(tc.path, func() {
+			req, err := http.NewRequest("GET", tc.path, nil)
+			if err != nil {
+				suite.Fail("unexpected error: %v", err)
+			}
+			req.Header.Set("Accept-Encoding", "br, gzip")
+
+			rr := httptest.NewRecorder()
+
+			// when
+			sut.handler(context.Background(), rr, req)
+
+			// then
+			suite.Equal(http.StatusOK, rr.Code)
+
+			ctype := rr.Header().Get("Content-Type")
+			suite.Equal(tc.contentType, ctype[0:len(tc.contentType)])
+		})
+	}
+}
+
+func (suite *ServeTestSuite) Test_ErrorFileOpening() {
+	// given
+	sut := &server{
+		cfg:    suite.cfg,
+		logger: zerolog.New(os.Stdout),
+	}
+
+	req, err := http.NewRequest("GET", "/mix%00", nil)
+	suite.Nil(err)
+	rr := httptest.NewRecorder()
+
+	// when
+	sut.handler(context.Background(), rr, req)
+
+	// then
+	suite.Equal(http.StatusInternalServerError, rr.Code)
+}
+
+func (suite *ServeTestSuite) Test_Must() {
+	suite.NotPanics(func() {
+		Must(nil)
+	})
+
+	suite.Panics(func() {
+		Must(errors.New("test error"))
+	})
 }

@@ -62,9 +62,7 @@ func loadConfiguration() (cfg Config) {
 	err := configureViper()
 	cfg = Config{}
 	err = viper.Unmarshal(&cfg)
-	if err != nil {
-		log.Fatal("Cannot read configuration")
-	}
+	Must(err)
 	return
 }
 
@@ -78,13 +76,12 @@ func configureViper() error {
 	viper.SetEnvPrefix("SPA_BASE")
 	viper.AutomaticEnv()
 	err := viper.ReadInConfig()
-	switch err.(type) {
-	case viper.ConfigFileNotFoundError:
+	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 		log.Println("No configuration file found, using defaults")
-		return nil
-	default:
-		return err
+		err = nil
 	}
+	return err
+
 }
 
 func setDefaults() {
@@ -101,21 +98,11 @@ func setDefaults() {
 
 func configureLogger(cfg Config) zerolog.Logger {
 	lvl := strings.ToLower(cfg.LoggingLevel)
-	var loglevel zerolog.Level
-	switch lvl {
-	case "trace":
-		loglevel = zerolog.TraceLevel
-	case "debug":
-		loglevel = zerolog.DebugLevel
-	case "information":
-		loglevel = zerolog.InfoLevel
-	case "warning":
-		loglevel = zerolog.WarnLevel
-	case "error":
-		loglevel = zerolog.ErrorLevel
-	default:
+	loglevel, err := zerolog.ParseLevel(lvl)
+	if err != nil {
 		loglevel = zerolog.InfoLevel
 	}
+
 	zerolog.SetGlobalLevel(loglevel)
 	l := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	if !cfg.JsonLogging {
